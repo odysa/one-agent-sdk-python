@@ -1,0 +1,31 @@
+[project]
+name = "one-agent-sdk"
+version = "0.1.6"
+description = "Drop-in replacement for claude-agent-sdk-python with multi-provider support"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "anyio>=4.0.0",
+    "mcp>=1.0.0",
+    "typing_extensions>=4.0.0",
+]
+license = "MIT"
+keywords = ["claude", "agent", "sdk", "ai", "llm", "multi-provider"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Typing :: Typed",
+]
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=0.50.0"]
+openai = ["openai>=1.0.0"]
+
+[build-system]
+requires = ["uv_build>=0.10.9,<0.11.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+one-agent-sdk = { path = "src/one_agent_sdk" }
