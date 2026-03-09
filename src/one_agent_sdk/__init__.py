@@ -26,19 +26,36 @@ from ._errors import (
     MessageParseError,
     ProcessError,
 )
+from ._internal.delegates import (
+    unstable_v2_create_session,
+    unstable_v2_prompt,
+    unstable_v2_resume_session,
+)
 from ._internal.sessions import get_session_messages, list_sessions
 from ._internal.transport import Transport
 from ._version import __version__
 from .client import ClaudeSDKClient
+from .mcp_server import (
+    create_sdk_mcp_server as _create_sdk_mcp_server_mock,
+    extract_tools_from_mcp_servers,
+    is_mock_mcp_server,
+    materialize_mcp_servers,
+)
 from .query import query
 from .types import (
     AbortError,
+    AccountInfo,
     AgentDefinition,
+    AgentInfo,
     ApiKeySource,
     AssistantMessage,
     AssistantMessageError,
     AsyncHookJSONOutput,
     BaseHookInput,
+    BetaMessage,
+    BetaRawMessageStreamEvent,
+    BetaUsage,
+    CallToolResult,
     CanUseTool,
     ClaudeAgentOptions,
     ConfigChangeHookInput,
@@ -53,28 +70,41 @@ from .types import (
     EXIT_REASONS,
     ExitReason,
     FastModeState,
+    GetSessionMessagesOptions,
     HOOK_EVENTS,
     HookCallback,
+    HookCallbackMatcher,
     HookContext,
     HookEvent,
-    HookInput,
     HookJSONOutput,
     HookMatcher,
     HookSpecificOutput,
     InstructionsLoadedHookInput,
+    JsonSchemaOutputFormat,
+    ListSessionsOptions,
+    McpClaudeAIProxyServerConfig,
     McpHttpServerConfig,
     McpSdkServerConfig,
+    McpSdkServerConfigWithInstance,
     McpServerConfig,
+    McpServerConfigForProcessTransport,
     McpServerConnectionStatus,
     McpServerInfo,
     McpServerStatus,
+    McpServerStatusConfig,
+    McpSetServersResult,
     McpSSEServerConfig,
     McpStdioServerConfig,
     McpToolInfo,
     Message,
+    MessageParam,
+    ModelInfo,
+    ModelUsage,
+    NonNullableUsage,
     NotificationHookInput,
     NotificationHookSpecificOutput,
     OnElicitation,
+    OutputFormat,
     OutputFormatType,
     PermissionBehavior,
     PermissionMode,
@@ -97,21 +127,55 @@ from .types import (
     PromptRequestOption,
     PromptResponse,
     ResultMessage,
+    RewindFilesResult,
+    SandboxFilesystemConfig,
     SandboxIgnoreViolations,
     SandboxNetworkConfig,
     SandboxSettings,
+    SDKAssistantMessage,
+    SDKAuthStatusMessage,
     SdkBeta,
+    SDKCompactBoundaryMessage,
+    SDKControlInitializeResponse,
+    SDKElicitationCompleteMessage,
+    SDKFilesPersistedEvent,
+    SDKHookProgressMessage,
+    SDKHookResponseMessage,
+    SDKHookStartedMessage,
+    SDKLocalCommandOutputMessage,
     SdkMcpTool,
+    SDKMessage,
+    SDKPartialAssistantMessage,
+    SDKPermissionDenial,
     SdkPluginConfig,
+    SDKPromptSuggestionMessage,
+    SDKRateLimitEvent,
+    SDKRateLimitInfo,
+    SDKResultError,
+    SDKResultMessage,
+    SDKResultSuccess,
     SDKSessionInfo,
+    SDKSessionOptions,
     SDKStatus,
+    SDKStatusMessage,
+    SDKSystemMessage,
+    SDKTaskNotificationMessage,
+    SDKTaskProgressMessage,
+    SDKTaskStartedMessage,
+    SDKToolProgressMessage,
+    SDKToolUseSummaryMessage,
+    SDKUserMessage,
+    SDKUserMessageReplay,
     SessionEndHookInput,
     SessionMessage,
     SessionStartHookInput,
     SessionStartHookSpecificOutput,
+    Settings,
     SettingSource,
     SetupHookInput,
     SetupHookSpecificOutput,
+    SlashCommand,
+    SpawnOptions,
     StopHookInput,
     StreamEvent,
     SubagentStartHookInput,
@@ -133,6 +197,8 @@ from .types import (
     ThinkingConfigAdaptive,
     ThinkingConfigDisabled,
     ThinkingConfigEnabled,
+    ToolAnnotations,
+    ToolConfig,
     ToolPermissionContext,
     ToolResultBlock,
     ToolsPreset,
@@ -280,58 +346,6 @@ def tool(
 
 
 # ---------------------------------------------------------------------------
-# Deprecated helpers (for parity with TS SDK)
-# ---------------------------------------------------------------------------
-
-
-def define_agent(
-    *,
-    name: str,
-    description: str,
-    prompt: str,
-    tools: list[ToolDef] | None = None,
-    handoffs: list[str] | None = None,
-    model: str | None = None,
-    mcp_servers: dict[str, AgentMcpServerConfig] | None = None,
-) -> AgentDef:
-    """Convenience helper to define an agent with type checking.
-
-    .. deprecated::
-        Will be removed in v0.2. Use ``AgentDef`` directly.
-    """
-    import warnings
-
-    warnings.warn("define_agent() is deprecated, use AgentDef directly", DeprecationWarning, stacklevel=2)
-    return AgentDef(
-        name=name,
-        description=description,
-        prompt=prompt,
-        tools=tools,
-        handoffs=handoffs,
-        model=model,
-        mcp_servers=mcp_servers,
-    )
-
-
-def define_tool(
-    *,
-    name: str,
-    description: str,
-    parameters: Any,
-    handler: Callable[..., Awaitable[str]],
-) -> ToolDef:
-    """Convenience helper to define a tool with type-safe parameters.
-
-    .. deprecated::
-        Will be removed in v0.2. Use ``tool()`` instead.
-    """
-    import warnings
-
-    warnings.warn("define_tool() is deprecated, use tool() instead", DeprecationWarning, stacklevel=2)
-    return ToolDef(name=name, description=description, parameters=parameters, handler=handler)
-
-
-# ---------------------------------------------------------------------------
 # create_sdk_mcp_server()
 # ---------------------------------------------------------------------------
 
@@ -394,6 +408,58 @@ def create_sdk_mcp_server(
 
 
 # ---------------------------------------------------------------------------
+# Deprecated helpers (for parity with TS SDK)
+# ---------------------------------------------------------------------------
+
+
+def define_agent(
+    *,
+    name: str,
+    description: str,
+    prompt: str,
+    tools: list[ToolDef] | None = None,
+    handoffs: list[str] | None = None,
+    model: str | None = None,
+    mcp_servers: dict[str, AgentMcpServerConfig] | None = None,
+) -> AgentDef:
+    """Convenience helper to define an agent with type checking.
+
+    .. deprecated::
+        Will be removed in v0.2. Use ``AgentDef`` directly.
+    """
+    import warnings
+
+    warnings.warn("define_agent() is deprecated, use AgentDef directly", DeprecationWarning, stacklevel=2)
+    return AgentDef(
+        name=name,
+        description=description,
+        prompt=prompt,
+        tools=tools,
+        handoffs=handoffs,
+        model=model,
+        mcp_servers=mcp_servers,
+    )
+
+
+def define_tool(
+    *,
+    name: str,
+    description: str,
+    parameters: Any,
+    handler: Callable[..., Awaitable[str]],
+) -> ToolDef:
+    """Convenience helper to define a tool with type-safe parameters.
+
+    .. deprecated::
+        Will be removed in v0.2. Use ``tool()`` instead.
+    """
+    import warnings
+
+    warnings.warn("define_tool() is deprecated, use tool() instead", DeprecationWarning, stacklevel=2)
+    return ToolDef(name=name, description=description, parameters=parameters, handler=handler)
+
+
+# ---------------------------------------------------------------------------
 # __all__
 # ---------------------------------------------------------------------------
 
@@ -406,6 +472,14 @@ __all__ = [
     "create_sdk_mcp_server",
     "list_sessions",
     "get_session_messages",
+    # v2 unstable APIs
+    "unstable_v2_create_session",
+    "unstable_v2_prompt",
+    "unstable_v2_resume_session",
+    # MCP server utilities
+    "is_mock_mcp_server",
+    "extract_tools_from_mcp_servers",
+    "materialize_mcp_servers",
     # Client
     "ClaudeSDKClient",
     # Transport
@@ -439,6 +513,11 @@ __all__ = [
     "McpSSEServerConfig",
     "McpHttpServerConfig",
     "McpSdkServerConfig",
+    "McpSdkServerConfigWithInstance",
+    "McpClaudeAIProxyServerConfig",
+    "McpServerConfigForProcessTransport",
+    "McpServerStatusConfig",
+    "McpSetServersResult",
     "McpServerStatus",
     "McpServerConnectionStatus",
     "McpServerInfo",
@@ -458,6 +537,7 @@ __all__ = [
     "HookEvent",
     "HOOK_EVENTS",
     "HookCallback",
+    "HookCallbackMatcher",
     "HookContext",
     "HookMatcher",
     "HookInput",
@@ -510,15 +590,24 @@ __all__ = [
     "SdkPluginConfig",
     "ConfigScope",
     "OutputFormatType",
+    "OutputFormat",
+    "JsonSchemaOutputFormat",
+    "ToolConfig",
+    "ToolAnnotations",
+    "Settings",
     # Agent
     "AgentDefinition",
     # Session
     "SDKSessionInfo",
+    "SDKSessionOptions",
+    "ListSessionsOptions",
+    "GetSessionMessagesOptions",
     "SessionMessage",
     # Sandbox
     "SandboxSettings",
     "SandboxNetworkConfig",
     "SandboxIgnoreViolations",
+    "SandboxFilesystemConfig",
     # Elicitation
     "ElicitationRequest",
     "ElicitationResult",
@@ -535,6 +624,50 @@ __all__ = [
     "ApiKeySource",
     "FastModeState",
     "SDKStatus",
+    # Model / Account
+    "ModelInfo",
+    "ModelUsage",
+    "NonNullableUsage",
+    "AccountInfo",
+    "AgentInfo",
+    "SlashCommand",
+    "RewindFilesResult",
+    "SpawnOptions",
+    "CallToolResult",
+    # External stubs
+    "BetaUsage",
+    "BetaMessage",
+    "BetaRawMessageStreamEvent",
+    "MessageParam",
+    # SDK message types
+    "SDKMessage",
+    "SDKPermissionDenial",
+    "SDKAssistantMessage",
+    "SDKUserMessage",
+    "SDKUserMessageReplay",
+    "SDKResultSuccess",
+    "SDKResultError",
+    "SDKResultMessage",
+    "SDKSystemMessage",
+    "SDKPartialAssistantMessage",
+    "SDKCompactBoundaryMessage",
+    "SDKStatusMessage",
+    "SDKLocalCommandOutputMessage",
+    "SDKHookStartedMessage",
+    "SDKHookProgressMessage",
+    "SDKHookResponseMessage",
+    "SDKToolProgressMessage",
+    "SDKAuthStatusMessage",
+    "SDKTaskNotificationMessage",
+    "SDKTaskStartedMessage",
+    "SDKTaskProgressMessage",
+    "SDKFilesPersistedEvent",
+    "SDKToolUseSummaryMessage",
+    "SDKRateLimitInfo",
+    "SDKRateLimitEvent",
+    "SDKElicitationCompleteMessage",
+    "SDKPromptSuggestionMessage",
+    "SDKControlInitializeResponse",
     # Errors
     "ClaudeSDKError",
     "CLINotFoundError",

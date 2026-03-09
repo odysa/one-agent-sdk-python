@@ -22,6 +22,11 @@ classifiers = [
 [project.optional-dependencies]
 anthropic = ["anthropic>=0.50.0"]
 openai = ["openai>=1.0.0"]
+kimi = ["openai>=1.0.0"]
+codex = ["openai>=1.0.0"]
+copilot = ["openai>=1.0.0"]
+openrouter = ["openai>=1.0.0"]
+all = ["anthropic>=0.50.0", "openai>=1.0.0"]
 
 [build-system]
 requires = ["uv_build>=0.10.9,<0.11.0"]

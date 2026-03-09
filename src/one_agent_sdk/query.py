@@ -99,12 +99,8 @@ async def _query_other_provider(
     tools: list[ToolDef] = []
     mcp_servers = opts.mcp_servers
     if isinstance(mcp_servers, dict):
-        for _name, cfg in mcp_servers.items():
-            if isinstance(cfg, dict) and cfg.get("type") == "sdk":
-                instance = cfg.get("instance")
-                if instance is not None and hasattr(instance, "_tools"):
-                    # Try to extract tool definitions from SDK server
-                    pass
+        from .mcp_server import extract_tools_from_mcp_servers
+        tools = extract_tools_from_mcp_servers(mcp_servers)
 
     agent = AgentDef(
         name="default",

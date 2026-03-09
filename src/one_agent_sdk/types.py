@@ -205,12 +205,40 @@ class McpSdkServerConfig(TypedDict):
     instance: Any
 
 
-McpServerConfig = (
+class McpSdkServerConfigWithInstance(TypedDict):
+    type: Literal["sdk"]
+    name: str
+    instance: Any
+
+
+class McpClaudeAIProxyServerConfig(TypedDict):
+    type: Literal["claudeai-proxy"]
+    url: str
+    id: str
+
+
+McpServerConfigForProcessTransport = (
     McpStdioServerConfig
     | McpSSEServerConfig
     | McpHttpServerConfig
     | McpSdkServerConfig
 )
+
+McpServerConfig = (
+    McpStdioServerConfig
+    | McpSSEServerConfig
+    | McpHttpServerConfig
+    | McpSdkServerConfigWithInstance
+)
+
+McpServerStatusConfig = McpServerConfigForProcessTransport | McpClaudeAIProxyServerConfig
+
+
+class McpSetServersResult(TypedDict):
+    added: list[str]
+    removed: list[str]
+    errors: dict[str, str]
+
 
 # ---------------------------------------------------------------------------
 # MCP server status
@@ -898,3 +926,487 @@ class PromptRequest(TypedDict):
 class PromptResponse(TypedDict):
     prompt_response: str
     selected: str
+
+
+# ---------------------------------------------------------------------------
+# Model / Account types
+# ---------------------------------------------------------------------------
+
+
+class ModelInfo(TypedDict):
+    value: str
+    displayName: str
+    description: str
+    supportsEffort: NotRequired[bool]
+    supportedEffortLevels: NotRequired[list[Literal["low", "medium", "high", "max"]]]
+    supportsAdaptiveThinking: NotRequired[bool]
+    supportsFastMode: NotRequired[bool]
+
+
+class ModelUsage(TypedDict):
+    inputTokens: int
+    outputTokens: int
+    cacheReadInputTokens: int
+    cacheCreationInputTokens: int
+    webSearchRequests: int
+    costUSD: float
+    contextWindow: int
+    maxOutputTokens: int
+
+
+class NonNullableUsage(TypedDict):
+    input_tokens: int
+    output_tokens: int
+    cache_read_input_tokens: int
+    cache_creation_input_tokens: int
+
+
+class AccountInfo(TypedDict, total=False):
+    email: str
+    organization: str
+    subscriptionType: str
+    tokenSource: str
+    apiKeySource: str
+
+
+class AgentInfo(TypedDict):
+    name: str
+    description: str
+    model: NotRequired[str]
+
+
+class SlashCommand(TypedDict):
+    name: str
+    description: str
+    argumentHint: str
+
+
+class RewindFilesResult(TypedDict):
+    canRewind: bool
+    error: NotRequired[str]
+    filesChanged: NotRequired[list[str]]
+    insertions: NotRequired[int]
+    deletions: NotRequired[int]
+
+
+class ToolConfig(TypedDict, total=False):
+    askUserQuestion: dict[str, Any]
+
+
+class JsonSchemaOutputFormat(TypedDict):
+    type: Literal["json_schema"]
+    schema: dict[str, Any]
+
+
+OutputFormat = JsonSchemaOutputFormat
+
+SandboxFilesystemConfig = dict[str, Any]
+
+Settings = dict[str, Any]
+
+
+class SpawnOptions(TypedDict):
+    command: str
+    args: list[str]
+    env: dict[str, str | None]
+    cwd: str
+
+
+class ToolAnnotations(TypedDict, total=False):
+    title: str
+    readOnlyHint: bool
+    destructiveHint: bool
+    idempotentHint: bool
+    openWorldHint: bool
+
+
+class CallToolResult(TypedDict):
+    content: list[dict[str, Any]]
+    isError: NotRequired[bool]
+
+
+# ---------------------------------------------------------------------------
+# External type stubs (minimal compatible definitions)
+# ---------------------------------------------------------------------------
+
+
+class BetaUsage(TypedDict):
+    input_tokens: int
+    output_tokens: int
+    cache_read_input_tokens: NotRequired[int | None]
+    cache_creation_input_tokens: NotRequired[int | None]
+
+
+class BetaMessage(TypedDict):
+    id: str
+    type: Literal["message"]
+    role: Literal["assistant"]
+    content: list[dict[str, Any]]
+    model: str
+    stop_reason: str | None
+    stop_sequence: str | None
+    usage: BetaUsage
+
+
+class BetaRawMessageStreamEvent(TypedDict):
+    type: str
+
+
+class MessageParam(TypedDict):
+    role: Literal["user", "assistant"]
+    content: str | list[dict[str, Any]]
+
+
+# ---------------------------------------------------------------------------
+# SDK message types (matching TS sdk/types.ts)
+# ---------------------------------------------------------------------------
+
+
+class SDKPermissionDenial(TypedDict):
+    tool_name: str
+    tool_use_id: str
+    tool_input: dict[str, Any]
+
+
+class SDKAssistantMessage(TypedDict):
+    type: Literal["assistant"]
+    message: BetaMessage
+    parent_tool_use_id: str | None
+    error: NotRequired[AssistantMessageError]
+    uuid: str
+    session_id: str
+
+
+class SDKUserMessage(TypedDict):
+    type: Literal["user"]
+    message: MessageParam
+    parent_tool_use_id: str | None
+    isSynthetic: NotRequired[bool]
+    tool_use_result: NotRequired[Any]
+    priority: NotRequired[Literal["now", "next", "later"]]
+    uuid: NotRequired[str]
+    session_id: str
+
+
+class SDKUserMessageReplay(SDKUserMessage):
+    isReplay: Literal[True]
+    uuid: str  # type: ignore[assignment]
+
+
+class SDKResultSuccess(TypedDict):
+    type: Literal["result"]
+    subtype: Literal["success"]
+    duration_ms: int
+    duration_api_ms: int
+    is_error: bool
+    num_turns: int
+    result: str
+    stop_reason: str | None
+    total_cost_usd: float
+    usage: NonNullableUsage
+    modelUsage: dict[str, ModelUsage]
+    permission_denials: list[SDKPermissionDenial]
+    structured_output: NotRequired[Any]
+    fast_mode_state: NotRequired[FastModeState]
+    uuid: str
+    session_id: str
+
+
+class SDKResultError(TypedDict):
+    type: Literal["result"]
+    subtype: Literal[
+        "error_during_execution",
+        "error_max_turns",
+        "error_max_budget_usd",
+        "error_max_structured_output_retries",
+    ]
+    duration_ms: int
+    duration_api_ms: int
+    is_error: bool
+    num_turns: int
+    stop_reason: str | None
+    total_cost_usd: float
+    usage: NonNullableUsage
+    modelUsage: dict[str, ModelUsage]
+    permission_denials: list[SDKPermissionDenial]
+    errors: list[str]
+    fast_mode_state: NotRequired[FastModeState]
+    uuid: str
+    session_id: str
+
+
+SDKResultMessage = SDKResultSuccess | SDKResultError
+
+
+class SDKSystemMessage(TypedDict):
+    type: Literal["system"]
+    subtype: Literal["init"]
+    agents: NotRequired[list[str]]
+    apiKeySource: ApiKeySource
+    betas: NotRequired[list[str]]
+    claude_code_version: str
+    cwd: str
+    tools: list[str]
+    mcp_servers: list[dict[str, str]]
+    model: str
+    permissionMode: PermissionMode
+    slash_commands: list[str]
+    output_style: str
+    skills: list[str]
+    plugins: list[dict[str, str]]
+    fast_mode_state: NotRequired[FastModeState]
+    uuid: str
+    session_id: str
+
+
+class SDKPartialAssistantMessage(TypedDict):
+    type: Literal["stream_event"]
+    event: BetaRawMessageStreamEvent
+    parent_tool_use_id: str | None
+    uuid: str
+    session_id: str
+
+
+class SDKCompactBoundaryMessage(TypedDict):
+    type: Literal["system"]
+    subtype: Literal["compact_boundary"]
+    compact_metadata: dict[str, Any]
+    uuid: str
+    session_id: str
+
+
+class SDKStatusMessage(TypedDict):
+    type: Literal["system"]
+    subtype: Literal["status"]
+    status: Literal["compacting"] | None
+    permissionMode: NotRequired[PermissionMode]
+    uuid: str
+    session_id: str
+
+
+class SDKLocalCommandOutputMessage(TypedDict):
+    type: Literal["system"]
+    subtype: Literal["local_command_output"]
+    content: str
+    uuid: str
+    session_id: str
+
+
+class SDKHookStartedMessage(TypedDict):
+    type: Literal["system"]
+    subtype: Literal["hook_started"]
+    hook_id: str
+    hook_name: str
+    hook_event: str
+    uuid: str
+    session_id: str
+
+
+class SDKHookProgressMessage(TypedDict):
+    type: Literal["system"]
+    subtype: Literal["hook_progress"]
+    hook_id: str
+    hook_name: str
+    hook_event: str
+    stdout: str
+    stderr: str
+    output: str
+    uuid: str
+    session_id: str
+
+
+class SDKHookResponseMessage(TypedDict):
+    type: Literal["system"]
+    subtype: Literal["hook_response"]
+    hook_id: str
+    hook_name: str
+    hook_event: str
+    output: str
+    stdout: str
+    stderr: str
+    exit_code: NotRequired[int]
+    outcome: Literal["success", "error", "cancelled"]
+    uuid: str
+    session_id: str
+
+
+class SDKToolProgressMessage(TypedDict):
+    type: Literal["tool_progress"]
+    tool_use_id: str
+    tool_name: str
+    parent_tool_use_id: str | None
+    elapsed_time_seconds: float
+    task_id: NotRequired[str]
+    uuid: str
+    session_id: str
+
+
+class SDKAuthStatusMessage(TypedDict):
+    type: Literal["auth_status"]
+    isAuthenticating: bool
+    output: list[str]
+    error: NotRequired[str]
+    uuid: str
+    session_id: str
+
+
+class SDKTaskNotificationMessage(TypedDict):
+    type: Literal["system"]
+    subtype: Literal["task_notification"]
+    task_id: str
+    tool_use_id: NotRequired[str]
+    status: Literal["completed", "failed", "stopped"]
+    output_file: str
+    summary: str
+    usage: NotRequired[TaskUsage]
+    uuid: str
+    session_id: str
+
+
+class SDKTaskStartedMessage(TypedDict):
+    type: Literal["system"]
+    subtype: Literal["task_started"]
+    task_id: str
+    tool_use_id: NotRequired[str]
+    description: str
+    task_type: NotRequired[str]
+    prompt: NotRequired[str]
+    uuid: str
+    session_id: str
+
+
+class SDKTaskProgressMessage(TypedDict):
+    type: Literal["system"]
+    subtype: Literal["task_progress"]
+    task_id: str
+    tool_use_id: NotRequired[str]
+    description: str
+    usage: TaskUsage
+    last_tool_name: NotRequired[str]
+    uuid: str
+    session_id: str
+
+
+class SDKFilesPersistedEvent(TypedDict):
+    type: Literal["system"]
+    subtype: Literal["files_persisted"]
+    files: list[dict[str, str]]
+    failed: list[dict[str, str]]
+    processed_at: str
+    uuid: str
+    session_id: str
+
+
+class SDKToolUseSummaryMessage(TypedDict):
+    type: Literal["tool_use_summary"]
+    summary: str
+    preceding_tool_use_ids: list[str]
+    uuid: str
+    session_id: str
+
+
+class SDKRateLimitInfo(TypedDict, total=False):
+    status: Literal["allowed", "allowed_warning", "rejected"]
+    resetsAt: int
+    rateLimitType: str
+    utilization: float
+    overageStatus: str
+    overageResetsAt: int
+    overageDisabledReason: str
+    isUsingOverage: bool
+    surpassedThreshold: int
+
+
+class SDKRateLimitEvent(TypedDict):
+    type: Literal["rate_limit_event"]
+    rate_limit_info: SDKRateLimitInfo
+    uuid: str
+    session_id: str
+
+
+class SDKElicitationCompleteMessage(TypedDict):
+    type: Literal["system"]
+    subtype: Literal["elicitation_complete"]
+    mcp_server_name: str
+    elicitation_id: str
+    uuid: str
+    session_id: str
+
+
+class SDKPromptSuggestionMessage(TypedDict):
+    type: Literal["prompt_suggestion"]
+    suggestion: str
+    uuid: str
+    session_id: str
+
+
+SDKMessage = (
+    SDKAssistantMessage
+    | SDKUserMessage
+    | SDKUserMessageReplay
+    | SDKResultMessage
+    | SDKSystemMessage
+    | SDKPartialAssistantMessage
+    | SDKCompactBoundaryMessage
+    | SDKStatusMessage
+    | SDKLocalCommandOutputMessage
+    | SDKHookStartedMessage
+    | SDKHookProgressMessage
+    | SDKHookResponseMessage
+    | SDKToolProgressMessage
+    | SDKAuthStatusMessage
+    | SDKTaskNotificationMessage
+    | SDKTaskStartedMessage
+    | SDKTaskProgressMessage
+    | SDKFilesPersistedEvent
+    | SDKToolUseSummaryMessage
+    | SDKRateLimitEvent
+    | SDKElicitationCompleteMessage
+    | SDKPromptSuggestionMessage
+)
+
+
+# ---------------------------------------------------------------------------
+# Query control interface
+# ---------------------------------------------------------------------------
+
+
+class SDKControlInitializeResponse(TypedDict):
+    commands: list[SlashCommand]
+    agents: list[AgentInfo]
+    output_style: str
+    available_output_styles: list[str]
+    models: list[ModelInfo]
+    account: AccountInfo
+    fast_mode_state: NotRequired[FastModeState]
+
+
+class SDKSessionOptions(TypedDict, total=False):
+    model: str
+    pathToClaudeCodeExecutable: str
+    executable: Literal["node", "bun"]
+    executableArgs: list[str]
+    env: dict[str, str | None]
+    allowedTools: list[str]
+    disallowedTools: list[str]
+    canUseTool: CanUseTool
+    hooks: dict[str, list[Any]]
+    permissionMode: PermissionMode
+
+
+class ListSessionsOptions(TypedDict, total=False):
+    dir: str
+    limit: int
+    includeWorktrees: bool
+
+
+class GetSessionMessagesOptions(TypedDict, total=False):
+    dir: str
+    limit: int
+    offset: int
+
+
+# HookCallbackMatcher - matches TS shape
+class HookCallbackMatcher(TypedDict, total=False):
+    matcher: dict[str, Any]
+    callback: HookCallback

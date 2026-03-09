@@ -104,6 +104,41 @@ def _build_cli_args(options: ClaudeAgentOptions) -> list[str]:
         args.append("--enable-file-checkpointing")
     if options.fork_session:
         args.append("--fork-session")
+    if options.max_budget_usd is not None:
+        args.extend(["--max-budget-usd", str(options.max_budget_usd)])
+    if options.debug:
+        args.append("--debug")
+    if options.debug_file:
+        args.extend(["--debug-file", options.debug_file])
+    if options.session_id:
+        args.extend(["--session-id", options.session_id])
+    if options.allow_dangerously_skip_permissions:
+        args.append("--dangerously-skip-permissions")
+    if options.persist_session:
+        args.append("--persist-session")
+    if options.include_partial_messages:
+        args.append("--include-partial-messages")
+    if options.prompt_suggestions:
+        args.append("--prompt-suggestions")
+    if options.strict_mcp_config:
+        args.append("--strict-mcp-config")
+    if options.resume_session_at:
+        args.extend(["--resume-session-at", options.resume_session_at])
+    if options.effort:
+        args.extend(["--effort", options.effort])
+    if options.thinking:
+        thinking_type = options.thinking.get("type")
+        if thinking_type == "enabled":
+            budget = options.thinking.get("budget_tokens")
+            if budget:
+                args.extend(["--max-thinking-tokens", str(budget)])
+        elif thinking_type == "disabled":
+            args.extend(["--max-thinking-tokens", "0"])
+    for plugin in options.plugins:
+        args.extend(["--plugin", plugin.get("path", "")])
+    if options.setting_sources:
+        for source in options.setting_sources:
+            args.extend(["--setting-source", source])
 
     # Extra args passthrough
     for key, val in options.extra_args.items():
